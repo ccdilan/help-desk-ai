@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid, Plug } from '@lucide/vue';
+import { BookOpen, FolderGit2, LayoutGrid, Plug, PlusCircle } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -17,6 +17,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard, integrations } from '@/routes';
+import { create as ticketsCreate } from '@/routes/tickets';
 import type { NavItem } from '@/types';
 
 const page = usePage();
@@ -37,6 +38,13 @@ const mainNavItems = computed<NavItem[]>(() => [
             ? integrations(page.props.currentTeam.slug).url
             : '/integrations',
         icon: Plug,
+    },
+    {
+        title: 'New ticket',
+        href: page.props.currentTeam
+            ? ticketsCreate(page.props.currentTeam.slug).url
+            : '/tickets/create',
+        icon: PlusCircle,
     },
 ]);
 
