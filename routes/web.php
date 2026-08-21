@@ -5,6 +5,7 @@ use App\Http\Controllers\GitHub\GitHubConnectionController;
 use App\Http\Controllers\GitHub\GitHubWebhookController;
 use App\Http\Controllers\IntegrationPortalController;
 use App\Http\Controllers\Teams\TeamInvitationController;
+use App\Http\Controllers\TicketWizardController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,7 @@ Route::prefix('{current_team}')
     ->group(function () {
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('integrations', IntegrationPortalController::class)->name('integrations');
+        Route::get('tickets/create', TicketWizardController::class)->name('tickets.create');
     });
 
 Route::middleware(['auth'])->group(function () {
