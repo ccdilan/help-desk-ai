@@ -11,27 +11,28 @@ class IntegrationPortalController extends Controller
 {
     public function __invoke(Request $request): Response
     {
-        $projects = Project::query()
-            ->with('installations')
-            ->orderBy('name')
-            ->get()
-            ->map(fn (Project $project): array => [
+        $projects = [];
+
+        foreach (Project::query()->with('installations')->orderBy('name')->get() as $project) {
+            $installations = [];
+
+            foreach ($project->installations->sortBy('repository_full_name') as $installation) {
+                $installations[] = [
+                    'id' => $installation->id,
+                    'repositoryFullName' => $installation->repository_full_name,
+                    'status' => $installation->status,
+                    'lastSyncedAt' => $installation->last_synced_at?->toIso8601String(),
+                ];
+            }
+
+            $projects[] = [
                 'id' => $project->id,
                 'name' => $project->name,
                 'slug' => $project->slug,
                 'description' => $project->description,
-                'installations' => $project->installations
-                    ->sortBy('repository_full_name')
-                    ->values()
-                    ->map(fn ($installation): array => [
-                        'id' => $installation->id,
-                        'repositoryFullName' => $installation->repository_full_name,
-                        'status' => $installation->status,
-                        'lastSyncedAt' => $installation->last_synced_at?->toIso8601String(),
-                    ])
-                    ->all(),
-            ])
-            ->all();
+                'installations' => $installations,
+            ];
+        }
 
         return Inertia::render('Integrations', [
             'projects' => $projects,
