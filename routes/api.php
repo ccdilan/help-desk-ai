@@ -8,4 +8,5 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::post('projects/{project}/tickets', [TicketChatController::class, 'store'])->name('api.tickets.store');
     Route::get('tickets/{ticket}', [TicketChatController::class, 'show'])->name('api.tickets.show');
     Route::post('tickets/{ticket}/messages', [TicketChatController::class, 'addMessage'])->name('api.tickets.messages.store');
+    Route::post('tickets/{ticket}/prd', [TicketChatController::class, 'generatePrd'])->name('api.tickets.prd.store');
 });

@@ -7,6 +7,7 @@ use App\Http\Resources\TicketResource;
 use App\Models\Project;
 use App\Models\Ticket;
 use App\Services\DiscoveryAgentService;
+use App\Services\PrdGeneratorService;
 use App\Services\TicketChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class TicketChatController extends Controller
     public function __construct(
         private TicketChatService $ticketChat,
         private DiscoveryAgentService $discoveryAgent,
+        private PrdGeneratorService $prdGenerator,
     ) {}
 
     /**
@@ -71,6 +73,16 @@ class TicketChatController extends Controller
 
         return new TicketResource(
             $this->discoveryAgent->respond($ticket, $validated['content']),
+        );
+    }
+
+    /**
+     * Summarize the discovery conversation into a reviewable SRS/PRD.
+     */
+    public function generatePrd(Ticket $ticket): TicketResource
+    {
+        return new TicketResource(
+            $this->prdGenerator->generate($ticket),
         );
     }
 }
