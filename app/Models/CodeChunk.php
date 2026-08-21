@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property list<float>|null $embedding
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read float $distance Cosine distance selected by CodeChunkRepository::searchSimilar().
  * @property-read Project $project
  * @property-read GithubInstallation $installation
  */

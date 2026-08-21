@@ -6,6 +6,8 @@ use App\Contracts\ChatClient;
 use App\Contracts\EmbeddingClient;
 use App\Contracts\FileIngestor;
 use App\Contracts\GitHubClient;
+use App\Repositories\Contracts\CodeChunkRepository as CodeChunkRepositoryContract;
+use App\Repositories\Eloquent\CodeChunkRepository;
 use App\Services\Ai\OfflineChatClient;
 use App\Services\Ai\OfflineEmbeddingClient;
 use App\Services\Ai\OpenAIChatClient;
@@ -27,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(GitHubClient::class, ApiGitHubClient::class);
         $this->app->bind(FileIngestor::class, ChunkingFileIngestor::class);
+        $this->app->bind(CodeChunkRepositoryContract::class, CodeChunkRepository::class);
 
         $this->app->bind(EmbeddingClient::class, function (): EmbeddingClient {
             return match (config('ai.default')) {
