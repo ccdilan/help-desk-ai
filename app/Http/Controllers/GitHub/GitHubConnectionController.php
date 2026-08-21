@@ -23,6 +23,14 @@ class GitHubConnectionController extends Controller
             'project' => ['required', 'integer', 'exists:projects,id'],
         ]);
 
+        $appSlug = (string) config('services.github.app_slug');
+
+        if ($appSlug === '') {
+            return redirect()
+                ->back()
+                ->withErrors(['github' => 'GitHub integration is not configured yet. Add GITHUB_APP_SLUG, GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to your environment.']);
+        }
+
         $state = Str::random(32);
 
         Session::put('github.oauth.state', $state);

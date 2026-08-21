@@ -33,6 +33,18 @@ test('connect redirects to the github app installation page and stores state', f
         ->and(Session::get('github.oauth.project_id'))->toBe($project->id);
 });
 
+test('connect redirects back with an error when the github app is not configured', function () {
+    config(['services.github.app_slug' => null]);
+
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('github.connect', ['project' => $project->id]))
+        ->assertRedirect()
+        ->assertSessionHasErrors(['github']);
+});
+
 test('callback rejects a mismatched oauth state', function () {
     $user = User::factory()->create();
     Session::put('github.oauth.state', 'expected-state');

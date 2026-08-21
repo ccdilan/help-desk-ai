@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
-import { RefreshCw } from '@lucide/vue';
-import { ref } from 'vue';
+import { Head, router, usePage } from '@inertiajs/vue3';
+import { Plus, RefreshCw } from '@lucide/vue';
+import { computed, ref } from 'vue';
 import InstallationSyncController from '@/actions/App/Http/Controllers/Api/InstallationSyncController';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,14 @@ import type { GithubInstallationSummary, InstallationStatus, ProjectIntegration 
 defineProps<{
     projects: ProjectIntegration[];
 }>();
+
+const page = usePage();
+
+const githubError = computed(() => {
+    const errors = page.props.errors as Record<string, string> | undefined;
+
+    return errors?.github ?? null;
+});
 
 defineOptions({
     layout: {
@@ -59,6 +67,8 @@ const resync = (installation: GithubInstallationSummary): void => {
         },
     );
 };
+const connectUrl = (project: ProjectIntegration): string =>
+    githubConnectUrl({ query: { project: project.id } }).url;
 </script>
 
 <template>
@@ -67,24 +77,33 @@ const resync = (installation: GithubInstallationSummary): void => {
     <h1 class="sr-only">Integrations</h1>
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex items-start justify-between gap-4">
-            <Heading
-                title="Integrations"
-                description="Manage connected GitHub repositories and their sync status"
-            />
+        <Heading
+            title="Integrations"
+            description="Manage connected GitHub repositories and their sync status"
+        />
 
-            <Button as-child>
-                <a :href="githubConnectUrl().url">
-                    <RefreshCw class="mr-2 h-4 w-4" />
-                    Connect GitHub
-                </a>
-            </Button>
+        <div
+            v-if="githubError"
+            class="border-destructive bg-destructive/10 text-destructive rounded-md border px-4 py-3 text-sm"
+        >
+            {{ githubError }}
         </div>
 
         <Card v-for="project in projects" :key="project.id">
             <CardHeader>
-                <CardTitle>{{ project.name }}</CardTitle>
-                <CardDescription>{{ project.description ?? 'No description' }}</CardDescription>
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <CardTitle>{{ project.name }}</CardTitle>
+                        <CardDescription>{{ project.description ?? 'No description' }}</CardDescription>
+                    </div>
+
+                    <Button as-child>
+                        <a :href="connectUrl(project)">
+                            <Plus class="mr-2 h-4 w-4" />
+                            Connect repository
+                        </a>
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
                 <ul
@@ -126,7 +145,7 @@ const resync = (installation: GithubInstallationSummary): void => {
                     </li>
                 </ul>
                 <p v-else class="text-muted-foreground text-sm">
-                    No repositories connected yet.
+                    No repositories connected yet. Use “Connect repository” to install the GitHub App for this project.
                 </p>
             </CardContent>
         </Card>
