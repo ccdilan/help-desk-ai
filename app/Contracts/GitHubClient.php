@@ -19,12 +19,18 @@ interface GitHubClient
     /**
      * Fetch the recursive file tree of a repository.
      *
+     * When an installation id is given, the request is authenticated with a
+     * GitHub App installation access token so private repositories resolve.
+     *
      * @return array<int, array{path: string, type: string}>
      */
-    public function repositoryTree(string $fullName, string $ref): array;
+    public function repositoryTree(string $fullName, string $ref, ?int $installationId = null): array;
 
     /**
      * Fetch the raw content of a single file.
+     *
+     * When an installation id is given, the request is authenticated with a
+     * GitHub App installation access token so private repositories resolve.
      */
-    public function fileContent(string $fullName, string $path, string $ref): ?string;
+    public function fileContent(string $fullName, string $path, string $ref, ?int $installationId = null): ?string;
 }

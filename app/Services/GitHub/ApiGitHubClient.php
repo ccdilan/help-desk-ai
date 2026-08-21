@@ -4,6 +4,7 @@ namespace App\Services\GitHub;
 
 use App\Contracts\GitHubClient;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -54,9 +55,9 @@ class ApiGitHubClient implements GitHubClient
      *
      * @return array<int, array{path: string, type: string}>
      */
-    public function repositoryTree(string $fullName, string $ref): array
+    public function repositoryTree(string $fullName, string $ref, ?int $installationId = null): array
     {
-        $tree = $this->request()
+        $tree = $this->request($this->installationToken($installationId))
             ->get(self::API_BASE."/repos/{$fullName}/git/trees/{$ref}", [
                 'recursive' => 'true',
             ])
@@ -72,10 +73,18 @@ class ApiGitHubClient implements GitHubClient
     /**
      * Fetch the raw content of a single file.
      */
-    public function fileContent(string $fullName, string $path, string $ref): ?string
+    public function fileContent(string $fullName, string $path, string $ref, ?int $installationId = null): ?string
     {
         try {
-            return Http::accept('application/vnd.github.raw')
+            $token = $this->installationToken($installationId);
+
+            $request = Http::accept('application/vnd.github.raw');
+
+            if ($token !== null && $token !== '') {
+                $request = $request->withToken($token);
+            }
+
+            return $request
                 ->get(self::API_BASE."/repos/{$fullName}/contents/{$path}", [
                     'ref' => $ref,
                 ])
@@ -84,6 +93,68 @@ class ApiGitHubClient implements GitHubClient
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Mint (and cache) a GitHub App installation access token.
+     *
+     * Returns null when the app credentials are not configured, in which case
+     * callers fall back to unauthenticated requests (public repositories only).
+     */
+    private function installationToken(?int $installationId): ?string
+    {
+        if ($installationId === null) {
+            return null;
+        }
+
+        $appId = (string) config('services.github.app_id');
+        $privateKey = (string) config('services.github.private_key');
+
+        if ($privateKey !== '' && is_file($privateKey)) {
+            $privateKey = (string) file_get_contents($privateKey);
+        }
+
+        if ($appId === '' || $privateKey === '') {
+            return null;
+        }
+
+        return Cache::remember(
+            "github.installation-token.{$installationId}",
+            now()->addMinutes(50),
+            fn (): string => $this->requestInstallationToken((int) $appId, $privateKey, $installationId),
+        );
+    }
+
+    /**
+     * Exchange a signed app JWT for an installation access token.
+     */
+    private function requestInstallationToken(int $appId, string $privateKey, int $installationId): string
+    {
+        return $this->request()
+            ->withHeaders(['Authorization' => 'Bearer '.$this->appJwt($appId, $privateKey)])
+            ->post(self::API_BASE."/app/installations/{$installationId}/access_tokens")
+            ->throw()
+            ->json('token', '');
+    }
+
+    /**
+     * Build a short-lived RS256 JWT signed with the GitHub App private key.
+     */
+    private function appJwt(int $appId, string $privateKey): string
+    {
+        $encode = static fn (array $payload): string => rtrim(strtr(base64_encode((string) json_encode($payload)), '+/', '-_'), '=');
+
+        $header = $encode(['alg' => 'RS256', 'typ' => 'JWT']);
+        $claims = $encode([
+            'iat' => time() - 60,
+            'exp' => time() + 540,
+            'iss' => $appId,
+        ]);
+
+        $signature = '';
+        openssl_sign("{$header}.{$claims}", $signature, $privateKey, OPENSSL_ALGO_SHA256);
+
+        return "{$header}.{$claims}.".rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
     }
 
     /**

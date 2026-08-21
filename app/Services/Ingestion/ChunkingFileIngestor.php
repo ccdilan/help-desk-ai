@@ -23,7 +23,7 @@ class ChunkingFileIngestor implements FileIngestor
      */
     public function ingest(GithubInstallation $installation, string $path, string $ref): void
     {
-        $content = $this->github->fileContent($installation->repository_full_name, $path, $ref);
+        $content = $this->github->fileContent($installation->repository_full_name, $path, $ref, (int) $installation->installation_id);
 
         if ($content === null || trim($content) === '') {
             return;

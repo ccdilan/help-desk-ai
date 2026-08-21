@@ -37,9 +37,13 @@ return [
 
     'github' => [
         'app_slug' => env('GITHUB_APP_SLUG'),
+        'app_id' => env('GITHUB_APP_ID'),
         'client_id' => env('GITHUB_CLIENT_ID'),
         'client_secret' => env('GITHUB_CLIENT_SECRET'),
         'webhook_secret' => env('GITHUB_WEBHOOK_SECRET'),
+        // PEM contents or an absolute path to the .pem downloaded from the
+        // GitHub App settings page. Required for private repository access.
+        'private_key' => env('GITHUB_APP_PRIVATE_KEY'),
     ],
 
 ];

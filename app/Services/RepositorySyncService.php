@@ -30,7 +30,7 @@ class RepositorySyncService
         $installation->forceFill(['status' => 'syncing'])->save();
 
         try {
-            $tree = $this->github->repositoryTree($installation->repository_full_name, 'HEAD');
+            $tree = $this->github->repositoryTree($installation->repository_full_name, 'HEAD', (int) $installation->installation_id);
 
             $paths = collect($tree)
                 ->filter(fn (array $entry): bool => $entry['type'] === 'blob')
