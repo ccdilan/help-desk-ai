@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\TicketStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TicketResource;
 use App\Models\Project;
@@ -84,5 +85,15 @@ class TicketChatController extends Controller
         return new TicketResource(
             $this->prdGenerator->generate($ticket),
         );
+    }
+
+    /**
+     * Approve the generated SRS and close the discovery workflow.
+     */
+    public function signOff(Ticket $ticket): TicketResource
+    {
+        $ticket->forceFill(['status' => TicketStatus::SignedOff])->save();
+
+        return new TicketResource($ticket);
     }
 }
