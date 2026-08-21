@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\TicketResource;
 use App\Models\Project;
 use App\Models\Ticket;
+use App\Services\DiscoveryAgentService;
 use App\Services\TicketChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TicketChatController extends Controller
 {
-    public function __construct(private TicketChatService $ticketChat) {}
+    public function __construct(
+        private TicketChatService $ticketChat,
+        private DiscoveryAgentService $discoveryAgent,
+    ) {}
 
     /**
      * List the discovery tickets for a project.
@@ -35,10 +39,12 @@ class TicketChatController extends Controller
             'initial_prompt' => ['required', 'string'],
         ]);
 
-        $ticket = $this->ticketChat->startTicket(
-            $project,
-            $validated['title'],
-            $validated['initial_prompt'],
+        $ticket = $this->discoveryAgent->reply(
+            $this->ticketChat->startTicket(
+                $project,
+                $validated['title'],
+                $validated['initial_prompt'],
+            ),
         );
 
         return (new TicketResource($ticket))
@@ -55,7 +61,7 @@ class TicketChatController extends Controller
     }
 
     /**
-     * Append a user message to the ticket's conversation.
+     * Append a user message and return the assistant's clarifying reply.
      */
     public function addMessage(Request $request, Ticket $ticket): TicketResource
     {
@@ -63,8 +69,8 @@ class TicketChatController extends Controller
             'content' => ['required', 'string'],
         ]);
 
-        $this->ticketChat->appendMessage($ticket, 'user', $validated['content']);
-
-        return new TicketResource($ticket->load('messages'));
+        return new TicketResource(
+            $this->discoveryAgent->respond($ticket, $validated['content']),
+        );
     }
 }

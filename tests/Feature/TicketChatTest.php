@@ -25,6 +25,7 @@ test('an authenticated user can create a ticket from an initial prompt', functio
     expect($ticket->project_id)->toBe($project->id)
         ->and($ticket->status)->toBe(TicketStatus::Discovering)
         ->and($ticket->messages()->where('role', 'user')->count())->toBe(1)
+        ->and($ticket->messages()->where('role', 'assistant')->count())->toBe(1)
         ->and($ticket->messages()->first()->content)->toBe('Users should be able to filter search results by date.');
 });
 
@@ -67,9 +68,10 @@ test('a user message can be appended to an existing conversation', function () {
 
     $response->assertOk()
         ->assertJsonPath('messages.0.role', 'user')
-        ->assertJsonPath('messages.0.content', 'It should also support exporting to PDF.');
+        ->assertJsonPath('messages.0.content', 'It should also support exporting to PDF.')
+        ->assertJsonPath('messages.1.role', 'assistant');
 
-    expect($ticket->messages()->count())->toBe(1);
+    expect($ticket->messages()->count())->toBe(2);
 });
 
 test('appending a message requires content', function () {
