@@ -7,6 +7,7 @@ use App\Repositories\Contracts\CodeChunkRepository as CodeChunkRepositoryContrac
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class CodeChunkRepository implements CodeChunkRepositoryContract
@@ -25,6 +26,13 @@ class CodeChunkRepository implements CodeChunkRepositoryContract
             throw new RuntimeException('Vector similarity search requires PostgreSQL with pgvector.');
         }
 
+        Log::channel('rag')->info('Vector similarity search started', [
+            'project_id' => $projectId,
+            'installation_id' => $installationId,
+            'limit' => $limit,
+            'embedding_dimensions' => count($embedding),
+        ]);
+
         $literal = '['.implode(',', $embedding).']';
 
         $chunks = CodeChunk::query()
@@ -38,9 +46,22 @@ class CodeChunkRepository implements CodeChunkRepositoryContract
             ->limit($limit)
             ->get();
 
-        return $chunks->map(fn (CodeChunk $chunk): array => [
+        $results = $chunks->map(fn (CodeChunk $chunk): array => [
             'chunk' => $chunk,
             'distance' => (float) $chunk->distance,
         ]);
+
+        Log::channel('rag')->info('Vector similarity search completed', [
+            'project_id' => $projectId,
+            'installation_id' => $installationId,
+            'result_count' => $results->count(),
+            'results' => $results->map(fn (array $result): array => [
+                'file_path' => $result['chunk']->file_path,
+                'chunk_index' => $result['chunk']->chunk_index,
+                'distance' => $result['distance'],
+            ])->all(),
+        ]);
+
+        return $results;
     }
 }

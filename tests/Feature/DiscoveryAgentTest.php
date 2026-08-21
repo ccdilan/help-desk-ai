@@ -116,6 +116,35 @@ test('an unscoped ticket searches all repositories of the project', function () 
         ->and($chunks->searches[0]['installation_id'])->toBeNull();
 });
 
+test('rag retrieval is logged with the repository scope and selected context', function () {
+    $logger = fakeLogChannel('rag');
+    $this->app->instance(ChatClient::class, new RecordingChatSpy);
+
+    $project = Project::factory()->create();
+    $installation = GithubInstallation::factory()->for($project)->create();
+    $chunk = CodeChunk::factory()->for($installation, 'installation')->create([
+        'file_path' => 'app/Services/SearchService.php',
+    ]);
+    $this->app->instance(CodeChunkRepositoryContract::class, new FakeChunkRepository([$chunk]));
+
+    $user = User::factory()->create();
+    $ticket = Ticket::factory()->for($project)->for($installation, 'installation')->create();
+
+    $this->actingAs($user)
+        ->postJson("/api/tickets/{$ticket->id}/messages", ['content' => 'How does search filtering work today?'])
+        ->assertOk();
+
+    expect($logger->entries())->toHaveCount(1);
+
+    $entry = $logger->entries()[0];
+
+    expect($entry['message'])->toBe('Discovery context selected')
+        ->and($entry['context']['ticket_id'])->toBe($ticket->id)
+        ->and($entry['context']['installation_id'])->toBe($installation->id)
+        ->and($entry['context']['message'])->toBe('How does search filtering work today?')
+        ->and($entry['context']['context_paths'])->toBe(['app/Services/SearchService.php']);
+});
+
 test('the discovery agent passes the full conversation history to the model', function () {
     $spy = new RecordingChatSpy;
     $this->app->instance(ChatClient::class, $spy);

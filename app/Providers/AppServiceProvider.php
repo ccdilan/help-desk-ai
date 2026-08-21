@@ -8,6 +8,8 @@ use App\Contracts\FileIngestor;
 use App\Contracts\GitHubClient;
 use App\Repositories\Contracts\CodeChunkRepository as CodeChunkRepositoryContract;
 use App\Repositories\Eloquent\CodeChunkRepository;
+use App\Services\Ai\LoggingChatClient;
+use App\Services\Ai\LoggingEmbeddingClient;
 use App\Services\Ai\OfflineChatClient;
 use App\Services\Ai\OfflineEmbeddingClient;
 use App\Services\Ai\OpenAIChatClient;
@@ -33,19 +35,19 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CodeChunkRepositoryContract::class, CodeChunkRepository::class);
 
         $this->app->bind(EmbeddingClient::class, function (): EmbeddingClient {
-            return match (config('ai.default')) {
+            return new LoggingEmbeddingClient(match (config('ai.default')) {
                 'openai' => app(OpenAIEmbeddingClient::class),
                 default => new OfflineEmbeddingClient(
                     (int) config('ai.drivers.offline.dimensions', 1536),
                 ),
-            };
+            });
         });
 
         $this->app->bind(ChatClient::class, function (): ChatClient {
-            return match (config('ai.default')) {
+            return new LoggingChatClient(match (config('ai.default')) {
                 'openai' => app(OpenAIChatClient::class),
                 default => app(OfflineChatClient::class),
-            };
+            });
         });
     }
 

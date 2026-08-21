@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+use Tests\Support\RecordingLogger;
 use Tests\TestCase;
 
 /*
@@ -47,4 +49,19 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Swap the given log channel for a recording logger so tests can assert on log entries.
+ */
+function fakeLogChannel(string $channel): RecordingLogger
+{
+    $logger = new RecordingLogger;
+
+    Config::set('logging.channels.'.$channel, [
+        'driver' => 'custom',
+        'via' => fn (): RecordingLogger => $logger,
+    ]);
+
+    return $logger;
 }

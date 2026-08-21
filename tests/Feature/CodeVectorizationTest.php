@@ -6,6 +6,7 @@ use App\Contracts\GitHubClient;
 use App\Models\CodeChunk;
 use App\Models\GithubInstallation;
 use App\Services\Ai\CodeChunker;
+use App\Services\Ai\LoggingEmbeddingClient;
 use App\Services\Ai\OfflineEmbeddingClient;
 use App\Services\Ai\OpenAIEmbeddingClient;
 use App\Services\Ingestion\ChunkingFileIngestor;
@@ -161,6 +162,9 @@ test('ingestor skips files without content', function () {
 });
 
 test('the container binds the chunking ingestor and offline embedding driver by default', function () {
+    $embedding = app(EmbeddingClient::class);
+
     expect(app(FileIngestor::class))->toBeInstanceOf(ChunkingFileIngestor::class)
-        ->and(app(EmbeddingClient::class))->toBeInstanceOf(OfflineEmbeddingClient::class);
+        ->and($embedding)->toBeInstanceOf(LoggingEmbeddingClient::class)
+        ->and((new ReflectionProperty($embedding, 'inner'))->getValue($embedding))->toBeInstanceOf(OfflineEmbeddingClient::class);
 });

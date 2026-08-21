@@ -6,6 +6,7 @@ use App\Contracts\ChatClient;
 use App\Contracts\EmbeddingClient;
 use App\Models\Ticket;
 use App\Repositories\Contracts\CodeChunkRepository as CodeChunkRepositoryContract;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class DiscoveryAgentService
@@ -80,6 +81,12 @@ class DiscoveryAgentService
             );
         } catch (RuntimeException) {
             // Vector search requires PostgreSQL; degrade gracefully without context.
+            Log::channel('rag')->warning('Vector search unavailable, continuing without context', [
+                'ticket_id' => $ticket->id,
+                'project_id' => $ticket->project_id,
+                'installation_id' => $ticket->github_installation_id,
+            ]);
+
             return [];
         }
 
@@ -90,6 +97,14 @@ class DiscoveryAgentService
                 $paths[] = $result['chunk']->file_path;
             }
         }
+
+        Log::channel('rag')->info('Discovery context selected', [
+            'ticket_id' => $ticket->id,
+            'project_id' => $ticket->project_id,
+            'installation_id' => $ticket->github_installation_id,
+            'message' => $message,
+            'context_paths' => $paths,
+        ]);
 
         return $paths;
     }
