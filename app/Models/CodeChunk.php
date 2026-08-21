@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Models;
+
+use Database\Factories\CodeChunkFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
+
+/**
+ * @property int $id
+ * @property int $project_id
+ * @property string $file_path
+ * @property int $chunk_index
+ * @property string $code_content
+ * @property string|null $embedding
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read Project $project
+ */
+#[Fillable(['project_id', 'file_path', 'chunk_index', 'code_content', 'embedding'])]
+class CodeChunk extends Model
+{
+    /** @use HasFactory<CodeChunkFactory> */
+    use HasFactory;
+
+    /**
+     * Get the project this code chunk belongs to.
+     *
+     * @return BelongsTo<Project, $this>
+     */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+}
