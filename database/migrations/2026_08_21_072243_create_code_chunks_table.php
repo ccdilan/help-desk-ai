@@ -24,6 +24,10 @@ return new class extends Migration
         });
 
         if (DB::getDriverName() !== 'pgsql') {
+            Schema::table('code_chunks', function (Blueprint $table): void {
+                $table->text('embedding')->nullable();
+            });
+
             return;
         }
 

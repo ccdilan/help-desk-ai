@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\VectorEmbedding;
 use Database\Factories\CodeChunkFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,7 +17,7 @@ use Illuminate\Support\Carbon;
  * @property string $file_path
  * @property int $chunk_index
  * @property string $code_content
- * @property string|null $embedding
+ * @property list<float>|null $embedding
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Project $project
@@ -46,5 +47,17 @@ class CodeChunk extends Model
     public function installation(): BelongsTo
     {
         return $this->belongsTo(GithubInstallation::class, 'github_installation_id');
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'embedding' => VectorEmbedding::class,
+        ];
     }
 }
