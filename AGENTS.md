@@ -201,3 +201,44 @@ Vue components must have a single root element.
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>
+
+=== cyntrek-helpdesk/project rules ===
+
+# Cyntrek Helpdesk — Project Architecture Rules
+
+These rules are settled decisions for this codebase. Follow them for every change.
+
+## AI Provider Abstraction (SOLID)
+
+- Never call an AI/GitHub provider directly from controllers, jobs, or services. Depend on contracts only:
+  - `App\Contracts\EmbeddingClient` — `embed(string $text): array`, `embedAll(array $texts): array`
+  - `App\Contracts\ChatClient` — `complete(array $messages): string` (messages: `[['role' => ..., 'content' => ...]]`)
+  - `App\Contracts\GitHubClient` — repository tree/file access
+- Drivers live in `app/Services/Ai/*` and `app/Services/GitHub/*`. They are bound in `AppServiceProvider::register()` based on `config/ai.php` (`AI_DRIVER` env) and `config/services.php`.
+- Adding or switching a provider = new driver class + one config/env change. No call-site edits.
+- The offline drivers (`offline`) are deterministic and key-free; tests and local dev must never hit a live network.
+
+## Repository Pattern
+
+- Non-trivial queries (vector similarity search, aggregate/reporting queries) belong in repositories:
+  - Interface: `App\Repositories\Contracts\*Repository`
+  - Implementation: `App\Repositories\Eloquent\*Repository`
+  - Bind interface → implementation in `AppServiceProvider::register()`.
+- Controllers and services resolve repository interfaces, never Eloquent models directly for those queries.
+
+## Services & Jobs
+
+- Business logic lives in service classes under `app/Services/**`. Controllers stay thin: validate, delegate to a service/repository, respond.
+- Background work uses queued jobs under `app/Jobs`. A job only receives its input, delegates to a service, and updates status fields. No business logic inside jobs.
+- Webhook/external-event handling is delegated to dedicated handler services with signature verification.
+
+## Database & Vectors
+
+- pgvector-specific SQL (`vector` columns, `<=>` operator, HNSW indexes) must be guarded with `DB::getDriverName() !== 'pgsql'` checks so the sqlite test suite still migrates.
+- Tests that require Postgres are skipped via `->skip(fn () => config('database.default') !== 'pgsql')`; run them with `DB_CONNECTION=pgsql DB_DATABASE=helpdesk_testing php artisan test --compact --filter=...`.
+
+## Testing & Commits
+
+- Every task ships Pest feature tests. External APIs are faked via driver swaps or `Http::fake()` — never live network calls.
+- Commit per task using the spec task ID: `T2.1: GitHub App OAuth flow` style messages.
+- Frontend pages are Inertia + Vue 3 in `resources/js/pages`, using existing shadcn-style components in `resources/js/components/ui`. Run `npm run build` after frontend changes if the manifest is stale.
