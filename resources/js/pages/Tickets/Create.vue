@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { ArrowRight, Loader2, Send, Sparkles } from '@lucide/vue';
+import { ArrowRight, CheckCircle2, Loader2, Send, Sparkles } from '@lucide/vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import TicketChatController from '@/actions/App/Http/Controllers/Api/TicketChatController';
 import Heading from '@/components/Heading.vue';
@@ -37,6 +37,7 @@ type Ticket = {
     title: string;
     status: string;
     status_label: string;
+    discovery_complete: boolean;
     generated_prd: string | null;
     messages: ChatMessage[];
 };
@@ -240,7 +241,13 @@ const generatePrd = async (): Promise<void> => {
             <Card class="flex h-[32rem] flex-col">
                 <CardHeader>
                     <CardTitle>{{ ticket.title }}</CardTitle>
-                    <CardDescription>AI discovery chat — answer the analyst's questions</CardDescription>
+                    <CardDescription>
+                        {{
+                            ticket.discovery_complete
+                                ? 'Discovery complete — review the summary and generate the SRS'
+                                : "AI discovery chat — answer the analyst's questions"
+                        }}
+                    </CardDescription>
                 </CardHeader>
 
                 <div ref="messagesEl" class="flex-1 space-y-3 overflow-y-auto">
@@ -271,7 +278,20 @@ const generatePrd = async (): Promise<void> => {
                 </div>
             </Card>
 
-            <Button class="w-fit" :disabled="generating" @click="generatePrd">
+            <div v-if="ticket.discovery_complete" class="flex flex-col gap-3">
+                <div
+                    class="border-emerald-500/40 bg-emerald-500/10 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                >
+                    <CheckCircle2 class="text-emerald-600 h-4 w-4" />
+                    Requirements captured — the analyst has stopped asking questions.
+                </div>
+                <Button size="lg" :disabled="generating" @click="generatePrd">
+                    <Loader2 v-if="generating" class="mr-2 h-4 w-4 animate-spin" />
+                    <Sparkles v-else class="mr-2 h-4 w-4" />
+                    Generate SRS &amp; submit
+                </Button>
+            </div>
+            <Button v-else class="w-fit" :disabled="generating" @click="generatePrd">
                 <Sparkles class="mr-2 h-4 w-4" />
                 Generate SRS
             </Button>

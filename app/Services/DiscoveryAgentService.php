@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\ChatClient;
 use App\Contracts\EmbeddingClient;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 use App\Repositories\Contracts\CodeChunkRepository as CodeChunkRepositoryContract;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -15,6 +16,11 @@ class DiscoveryAgentService
      * Maximum number of repository files referenced in the system prompt.
      */
     private const CONTEXT_LIMIT = 8;
+
+    /**
+     * Maximum number of clarifying questions asked before wrapping up.
+     */
+    public const MAX_QUESTIONS = 3;
 
     public function __construct(
         private readonly TicketChatService $chat,
@@ -38,6 +44,9 @@ class DiscoveryAgentService
     /**
      * Generate the assistant's next turn from the current conversation.
      *
+     * Once the question limit is reached the assistant stops asking
+     * questions and replies with a closing requirements summary.
+     *
      * @return Ticket The ticket with its full message history.
      */
     public function reply(Ticket $ticket): Ticket
@@ -50,14 +59,38 @@ class DiscoveryAgentService
             $context = $this->relevantContext($ticket, $latestUser->content);
         }
 
+        $questionsAsked = $ticket->messages()->where('role', 'assistant')->count();
+
+        $systemPrompt = $questionsAsked >= self::MAX_QUESTIONS
+            ? $this->wrapUpPrompt($context)
+            : $this->systemPrompt($context);
+
         $reply = $this->completions->complete([
-            ['role' => 'system', 'content' => $this->systemPrompt($context)],
+            ['role' => 'system', 'content' => $systemPrompt],
             ...$this->conversationHistory($ticket),
         ]);
 
         $this->chat->appendMessage($ticket, 'assistant', $reply);
 
         return $ticket->load('messages');
+    }
+
+    /**
+     * Determine whether discovery has wrapped up for the given messages.
+     *
+     * @param  iterable<TicketMessage>  $messages
+     */
+    public static function isDiscoveryComplete(iterable $messages): bool
+    {
+        $assistantReplies = 0;
+
+        foreach ($messages as $message) {
+            if ($message->role === 'assistant') {
+                $assistantReplies++;
+            }
+        }
+
+        return $assistantReplies > self::MAX_QUESTIONS;
     }
 
     /**
@@ -116,24 +149,56 @@ class DiscoveryAgentService
      */
     private function systemPrompt(array $contextPaths): string
     {
-        $lines = [
+        return implode("\n", [
             'You are a senior requirements analyst running a discovery interview for a new helpdesk ticket.',
             'Your goal is to understand the requester\'s needs by asking focused clarifying questions, one at a time.',
-            'The team\'s codebase may already address part of the request; prefer asking about gaps rather than restating what exists.',
+            'Ask at most '.self::MAX_QUESTIONS.' clarifying questions in total; once you have enough information, stop asking.',
+            "The team's codebase may already address part of the request; prefer asking about gaps rather than restating what exists.",
             'Never quote or reveal raw source code contents in your replies.',
-            'Keep replies concise and conversational.',
-        ];
+            ...$this->contextLines($contextPaths),
+        ]);
+    }
 
+    /**
+     * Build the system prompt used once the question limit is reached.
+     *
+     * The assistant must close the interview with a requirements summary
+     * instead of asking further questions.
+     *
+     * @param  list<string>  $contextPaths
+     */
+    private function wrapUpPrompt(array $contextPaths): string
+    {
+        return implode("\n", [
+            'You are a senior requirements analyst closing a discovery interview for a new helpdesk ticket.',
+            'The limit of '.self::MAX_QUESTIONS.' clarifying questions has been reached.',
+            'Do not ask any further questions.',
+            'Reply with a short bullet list summarizing the confirmed requirements based strictly on the conversation.',
+            'End by inviting the requester to press "Generate SRS & submit" to finalize the ticket.',
+            'Never quote or reveal raw source code contents in your replies.',
+            ...$this->contextLines($contextPaths),
+        ]);
+    }
+
+    /**
+     * Describe the indexed repository context available to the model.
+     *
+     * @param  list<string>  $contextPaths
+     * @return list<string>
+     */
+    private function contextLines(array $contextPaths): array
+    {
         if ($contextPaths === []) {
-            $lines[] = 'No indexed repository context is available yet for this project.';
-        } else {
-            $lines[] = 'Repository files most relevant to the discussion:';
-            foreach ($contextPaths as $path) {
-                $lines[] = "- {$path}";
-            }
+            return ['No indexed repository context is available yet for this project.'];
         }
 
-        return implode("\n", $lines);
+        $lines = ['Repository files most relevant to the discussion:'];
+
+        foreach ($contextPaths as $path) {
+            $lines[] = "- {$path}";
+        }
+
+        return $lines;
     }
 
     /**

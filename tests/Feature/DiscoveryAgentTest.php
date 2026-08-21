@@ -5,6 +5,7 @@ use App\Models\CodeChunk;
 use App\Models\GithubInstallation;
 use App\Models\Project;
 use App\Models\Ticket;
+use App\Models\TicketMessage;
 use App\Models\User;
 use App\Repositories\Contracts\CodeChunkRepository as CodeChunkRepositoryContract;
 use Illuminate\Support\Collection;
@@ -182,4 +183,53 @@ test('the discovery agent degrades gracefully when vector search is unavailable'
         ->assertJsonPath('messages.1.role', 'assistant');
 
     expect($spy->calls[0][0]['content'])->toContain('No indexed repository context is available yet');
+});
+
+test('the discovery agent asks at most three clarifying questions before wrapping up', function () {
+    $spy = new RecordingChatSpy;
+    $this->app->instance(ChatClient::class, $spy);
+    $this->app->instance(CodeChunkRepositoryContract::class, new FakeChunkRepository([]));
+
+    $user = User::factory()->create();
+    $ticket = Ticket::factory()->has(TicketMessage::factory()->count(4)->sequence(
+        ['role' => 'user', 'content' => 'I need bulk export.'],
+        ['role' => 'assistant', 'content' => 'Which formats do you need?'],
+        ['role' => 'assistant', 'content' => 'How large are the exports?'],
+        ['role' => 'assistant', 'content' => 'Who should receive them?'],
+    ), 'messages')->create();
+
+    $response = $this->actingAs($user)
+        ->postJson("/api/tickets/{$ticket->id}/messages", ['content' => 'CSV for the finance team.'])
+        ->assertOk();
+
+    $systemPrompt = $spy->calls[0][0]['content'];
+
+    expect($systemPrompt)->toContain('Do not ask any further questions.')
+        ->and($systemPrompt)->toContain('Generate SRS & submit')
+        ->not->toContain('one at a time')
+        ->and($response->json('discovery_complete'))->toBeTrue();
+});
+
+test('the discovery agent keeps interviewing until the question limit is reached', function () {
+    $spy = new RecordingChatSpy;
+    $this->app->instance(ChatClient::class, $spy);
+    $this->app->instance(CodeChunkRepositoryContract::class, new FakeChunkRepository([]));
+
+    $user = User::factory()->create();
+    $ticket = Ticket::factory()->has(TicketMessage::factory()->count(3)->sequence(
+        ['role' => 'user', 'content' => 'I need bulk export.'],
+        ['role' => 'assistant', 'content' => 'Which formats do you need?'],
+        ['role' => 'assistant', 'content' => 'How large are the exports?'],
+    ), 'messages')->create();
+
+    $this->actingAs($user)
+        ->postJson("/api/tickets/{$ticket->id}/messages", ['content' => 'CSV and PDF.'])
+        ->assertOk()
+        ->assertJsonPath('discovery_complete', false);
+
+    $systemPrompt = $spy->calls[0][0]['content'];
+
+    expect($systemPrompt)->toContain('one at a time')
+        ->toContain('at most 3 clarifying questions')
+        ->not->toContain('Do not ask any further questions.');
 });

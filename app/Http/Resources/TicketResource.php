@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Ticket;
+use App\Services\DiscoveryAgentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -30,6 +31,7 @@ class TicketResource extends JsonResource
             'initial_prompt' => $this->resource->initial_prompt,
             'status' => $this->resource->status->value,
             'status_label' => $this->resource->status->label(),
+            'discovery_complete' => DiscoveryAgentService::isDiscoveryComplete($this->whenLoaded('messages', fn () => $this->resource->messages, [])),
             'generated_prd' => $this->resource->generated_prd,
             'created_at' => $this->resource->created_at?->toIso8601String(),
             'messages' => TicketMessageResource::collection($this->whenLoaded('messages')),
