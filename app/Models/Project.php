@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Collection<int, GithubInstallation> $installations
  * @property-read Collection<int, CodeChunk> $chunks
+ * @property-read Collection<int, Ticket> $tickets
  */
 #[Fillable(['name', 'slug', 'description'])]
 class Project extends Model
@@ -34,6 +35,16 @@ class Project extends Model
     public function installations(): HasMany
     {
         return $this->hasMany(GithubInstallation::class);
+    }
+
+    /**
+     * Get all discovery tickets created for this project.
+     *
+     * @return HasMany<Ticket, $this>
+     */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
     }
 
     /**
