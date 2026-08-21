@@ -4,6 +4,7 @@ namespace App\Http\Controllers\GitHub;
 
 use App\Contracts\GitHubClient;
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncRepositoryJob;
 use App\Models\GithubInstallation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,8 +67,10 @@ class GitHubConnectionController extends Controller
                 ->withErrors(['github' => 'Unable to complete the GitHub connection. Please try again.']);
         }
 
+        $installations = [];
+
         foreach ($repositories as $repository) {
-            GithubInstallation::query()->updateOrCreate(
+            $installations[] = GithubInstallation::query()->updateOrCreate(
                 [
                     'installation_id' => (string) $validated['installation_id'],
                     'repository_id' => $repository['id'],
@@ -78,6 +81,10 @@ class GitHubConnectionController extends Controller
                     'status' => 'pending',
                 ],
             );
+        }
+
+        foreach ($installations as $installation) {
+            SyncRepositoryJob::dispatch($installation);
         }
 
         return redirect()->route('dashboard');

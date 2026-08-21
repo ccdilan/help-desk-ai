@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Database\Factories\GithubInstallationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -20,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Project $project
+ * @property-read Collection<int, CodeChunk> $chunks
  */
 #[Fillable(['project_id', 'installation_id', 'repository_id', 'repository_full_name', 'status', 'last_synced_at'])]
 class GithubInstallation extends Model
@@ -35,6 +38,16 @@ class GithubInstallation extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * Get all code chunks ingested from this installation's repository.
+     *
+     * @return HasMany<CodeChunk, $this>
+     */
+    public function chunks(): HasMany
+    {
+        return $this->hasMany(CodeChunk::class, 'github_installation_id');
     }
 
     /**

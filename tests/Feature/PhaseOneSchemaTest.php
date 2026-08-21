@@ -26,14 +26,14 @@ test('github_installations table is created with expected columns', function () 
 test('code_chunks table is created with expected columns', function () {
     expect(Schema::hasTable('code_chunks'))->toBeTrue()
         ->and(Schema::hasColumns('code_chunks', [
-            'id', 'project_id', 'file_path', 'chunk_index', 'code_content', 'created_at', 'updated_at',
+            'id', 'project_id', 'github_installation_id', 'file_path', 'chunk_index', 'code_content', 'created_at', 'updated_at',
         ]))->toBeTrue();
 });
 
 test('deleting a project cascades to its installations and chunks', function () {
     $project = Project::factory()->create();
     $installation = GithubInstallation::factory()->for($project)->create();
-    $chunk = CodeChunk::factory()->for($project)->create();
+    $chunk = CodeChunk::factory()->for($installation, 'installation')->create();
 
     $project->delete();
 
@@ -41,13 +41,13 @@ test('deleting a project cascades to its installations and chunks', function () 
         ->and(CodeChunk::find($chunk->id))->toBeNull();
 });
 
-test('code chunks are unique per project, file path and chunk index', function () {
-    $project = Project::factory()->create();
-    CodeChunk::factory()->for($project)->create(['file_path' => 'app/Models/User.php', 'chunk_index' => 0]);
+test('code chunks are unique per installation, file path and chunk index', function () {
+    $installation = GithubInstallation::factory()->create();
+    CodeChunk::factory()->for($installation, 'installation')->create(['file_path' => 'app/Models/User.php', 'chunk_index' => 0]);
 
-    CodeChunk::factory()->for($project)->create(['file_path' => 'app/Models/User.php', 'chunk_index' => 1]);
+    CodeChunk::factory()->for($installation, 'installation')->create(['file_path' => 'app/Models/User.php', 'chunk_index' => 1]);
 
-    expect(fn () => CodeChunk::factory()->for($project)->create([
+    expect(fn () => CodeChunk::factory()->for($installation, 'installation')->create([
         'file_path' => 'app/Models/User.php',
         'chunk_index' => 0,
     ]))->toThrow(UniqueConstraintViolationException::class);
@@ -80,9 +80,9 @@ test('embedding column uses an HNSW index with cosine distance on pgsql', functi
 test('cosine similarity search returns the nearest code chunk on pgsql', function () {
     $embedding = fn (int $hot): string => '['.implode(',', array_replace(array_fill(0, 1536, '0'), [$hot => '1'])).']';
 
-    $project = Project::factory()->create();
-    $near = CodeChunk::factory()->for($project)->create();
-    $far = CodeChunk::factory()->for($project)->create();
+    $installation = GithubInstallation::factory()->create();
+    $near = CodeChunk::factory()->for($installation, 'installation')->create();
+    $far = CodeChunk::factory()->for($installation, 'installation')->create();
 
     DB::table('code_chunks')->where('id', $near->id)->update([
         'embedding' => DB::raw("'{$embedding(0)}'::vector"),

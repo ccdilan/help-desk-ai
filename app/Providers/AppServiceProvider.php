@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\FileIngestor;
 use App\Contracts\GitHubClient;
 use App\Services\GitHub\ApiGitHubClient;
+use App\Services\Ingestion\NullFileIngestor;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +20,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(GitHubClient::class, ApiGitHubClient::class);
+        $this->app->bind(FileIngestor::class, NullFileIngestor::class);
     }
 
     /**

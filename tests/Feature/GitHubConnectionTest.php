@@ -4,6 +4,7 @@ use App\Models\GithubInstallation;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Session;
 
 test('guests are redirected to login when connecting github', function () {
@@ -46,6 +47,8 @@ test('callback rejects a mismatched oauth state', function () {
 });
 
 test('callback stores installation repositories on the project', function () {
+    Queue::fake();
+
     Http::fake([
         'https://github.com/login/oauth/access_token' => Http::response(['access_token' => 'user-token']),
         'https://api.github.com/user/installations/123/repositories*' => Http::response([
@@ -82,6 +85,8 @@ test('callback stores installation repositories on the project', function () {
 });
 
 test('callback updates an existing installation instead of duplicating it', function () {
+    Queue::fake();
+
     Http::fake([
         'https://github.com/login/oauth/access_token' => Http::response(['access_token' => 'user-token']),
         'https://api.github.com/user/installations/123/repositories*' => Http::response([
