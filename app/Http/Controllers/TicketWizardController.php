@@ -13,10 +13,20 @@ class TicketWizardController extends Controller
     {
         $projects = [];
 
-        foreach (Project::query()->orderBy('name')->get(['id', 'name']) as $project) {
+        foreach (Project::query()->with('installations')->orderBy('name')->get() as $project) {
+            $installations = [];
+
+            foreach ($project->installations->sortBy('repository_full_name') as $installation) {
+                $installations[] = [
+                    'id' => $installation->id,
+                    'repositoryFullName' => $installation->repository_full_name,
+                ];
+            }
+
             $projects[] = [
                 'id' => $project->id,
                 'name' => $project->name,
+                'installations' => $installations,
             ];
         }
 

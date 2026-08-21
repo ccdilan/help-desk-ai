@@ -31,10 +31,14 @@ class RecordingChatSpy implements ChatClient
 
 class FakeChunkRepository implements CodeChunkRepositoryContract
 {
+    public array $searches = [];
+
     public function __construct(private readonly array $chunks) {}
 
-    public function searchSimilar(int $projectId, array $embedding, int $limit = 8): Collection
+    public function searchSimilar(int $projectId, array $embedding, int $limit = 8, ?int $installationId = null): Collection
     {
+        $this->searches[] = ['project_id' => $projectId, 'installation_id' => $installationId];
+
         return collect($this->chunks)
             ->map(fn (CodeChunk $chunk): array => ['chunk' => $chunk, 'distance' => 0.1])
             ->slice(0, $limit)
@@ -70,6 +74,46 @@ test('the discovery agent references relevant files without exposing raw code', 
     expect($spy->calls[0][0]['role'])->toBe('system')
         ->and($systemPrompt)->toContain('app/Services/SearchService.php')
         ->not->toContain('CLASSIFIED_SOURCE_CODE_BODY');
+});
+
+test('a ticket scoped to a repository only searches that repository\'s chunks', function () {
+    $spy = new RecordingChatSpy;
+    $this->app->instance(ChatClient::class, $spy);
+
+    $chunks = new FakeChunkRepository([]);
+    $this->app->instance(CodeChunkRepositoryContract::class, $chunks);
+
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $installation = GithubInstallation::factory()->for($project)->create();
+    $otherInstallation = GithubInstallation::factory()->for($project)->create();
+    $ticket = Ticket::factory()->for($project)->for($installation, 'installation')->create();
+
+    $this->actingAs($user)
+        ->postJson("/api/tickets/{$ticket->id}/messages", ['content' => 'How does search filtering work today?'])
+        ->assertOk();
+
+    expect($chunks->searches)->toHaveCount(1)
+        ->and($chunks->searches[0]['installation_id'])->toBe($installation->id)
+        ->and($chunks->searches[0]['installation_id'])->not->toBe($otherInstallation->id);
+});
+
+test('an unscoped ticket searches all repositories of the project', function () {
+    $spy = new RecordingChatSpy;
+    $this->app->instance(ChatClient::class, $spy);
+
+    $chunks = new FakeChunkRepository([]);
+    $this->app->instance(CodeChunkRepositoryContract::class, $chunks);
+
+    $user = User::factory()->create();
+    $ticket = Ticket::factory()->hasMessages(['role' => 'user', 'content' => 'I need bulk export.'])->create();
+
+    $this->actingAs($user)
+        ->postJson("/api/tickets/{$ticket->id}/messages", ['content' => 'Also CSV and PDF formats.'])
+        ->assertOk();
+
+    expect($chunks->searches)->toHaveCount(1)
+        ->and($chunks->searches[0]['installation_id'])->toBeNull();
 });
 
 test('the discovery agent passes the full conversation history to the model', function () {

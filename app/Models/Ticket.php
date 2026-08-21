@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $project_id
+ * @property int|null $github_installation_id
  * @property string $title
  * @property string $initial_prompt
  * @property TicketStatus $status
@@ -22,9 +23,10 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Project $project
+ * @property-read GithubInstallation|null $installation
  * @property-read Collection<int, TicketMessage> $messages
  */
-#[Fillable(['project_id', 'title', 'initial_prompt', 'status', 'generated_prd'])]
+#[Fillable(['project_id', 'github_installation_id', 'title', 'initial_prompt', 'status', 'generated_prd'])]
 class Ticket extends Model
 {
     /** @use HasFactory<TicketFactory> */
@@ -43,6 +45,16 @@ class Ticket extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * Get the repository this ticket is scoped to, if any.
+     *
+     * @return BelongsTo<GithubInstallation, $this>
+     */
+    public function installation(): BelongsTo
+    {
+        return $this->belongsTo(GithubInstallation::class, 'github_installation_id');
     }
 
     /**

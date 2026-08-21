@@ -2,6 +2,7 @@
 
 use App\Models\CodeChunk;
 use App\Models\GithubInstallation;
+use App\Models\Project;
 use App\Repositories\Contracts\CodeChunkRepository;
 use App\Repositories\Eloquent\CodeChunkRepository as EloquentCodeChunkRepository;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,30 @@ test('searchSimilar respects the limit', function () {
     $results = app(CodeChunkRepository::class)->searchSimilar($installation->project_id, $query, 2);
 
     expect($results)->toHaveCount(2);
+})->skip(fn () => config('database.default') !== 'pgsql');
+
+test('searchSimilar can be scoped to a single installation', function () {
+    $project = Project::factory()->create();
+    $target = GithubInstallation::factory()->for($project)->create();
+    $sibling = GithubInstallation::factory()->for($project)->create();
+
+    $hot = CodeChunk::factory()->for($target, 'installation')->create(['file_path' => 'app/Target.php']);
+    $foreign = CodeChunk::factory()->for($sibling, 'installation')->create(['file_path' => 'app/Sibling.php']);
+
+    seedEmbedding($hot, 10);
+    seedEmbedding($foreign, 10);
+
+    $query = array_fill(0, 1536, 0.0);
+    $query[10] = 1.0;
+
+    $results = app(CodeChunkRepository::class)->searchSimilar($project->id, $query, 8, $target->id);
+
+    expect($results)->toHaveCount(1)
+        ->and($results[0]['chunk']->is($hot))->toBeTrue();
+
+    $unscoped = app(CodeChunkRepository::class)->searchSimilar($project->id, $query, 8);
+
+    expect(collect($unscoped)->pluck('chunk.id'))->toContain($hot->id, $foreign->id);
 })->skip(fn () => config('database.default') !== 'pgsql');
 
 test('the container binds the eloquent repository implementation', function () {

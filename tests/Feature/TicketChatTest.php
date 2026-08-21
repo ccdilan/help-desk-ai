@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TicketStatus;
+use App\Models\GithubInstallation;
 use App\Models\Project;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
@@ -27,6 +28,44 @@ test('an authenticated user can create a ticket from an initial prompt', functio
         ->and($ticket->messages()->where('role', 'user')->count())->toBe(1)
         ->and($ticket->messages()->where('role', 'assistant')->count())->toBe(1)
         ->and($ticket->messages()->first()->content)->toBe('Users should be able to filter search results by date.');
+});
+
+test('a ticket can be created scoped to one of the project repositories', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $installation = GithubInstallation::factory()->for($project)->create([
+        'repository_full_name' => 'cyntreksl/jobbazaar-backoffice',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->postJson("/api/projects/{$project->id}/tickets", [
+            'title' => 'Search filters',
+            'initial_prompt' => 'Users should be able to filter search results by date.',
+            'github_installation_id' => $installation->id,
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('github_installation_id', $installation->id)
+        ->assertJsonPath('repository', 'cyntreksl/jobbazaar-backoffice');
+
+    expect(Ticket::query()->sole()->github_installation_id)->toBe($installation->id);
+});
+
+test('a ticket cannot be scoped to a repository from another project', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $foreignInstallation = GithubInstallation::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson("/api/projects/{$project->id}/tickets", [
+            'title' => 'Search filters',
+            'initial_prompt' => 'Users should be able to filter search results by date.',
+            'github_installation_id' => $foreignInstallation->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['github_installation_id']);
+
+    expect(Ticket::count())->toBe(0);
 });
 
 test('ticket creation requires a title and an initial prompt', function () {

@@ -21,6 +21,11 @@ class TicketResource extends JsonResource
         return [
             'id' => $this->resource->id,
             'project_id' => $this->resource->project_id,
+            'github_installation_id' => $this->resource->github_installation_id,
+            'repository' => $this->whenLoaded(
+                'installation',
+                fn (): ?string => $this->resource->installation?->repository_full_name,
+            ),
             'title' => $this->resource->title,
             'initial_prompt' => $this->resource->initial_prompt,
             'status' => $this->resource->status->value,

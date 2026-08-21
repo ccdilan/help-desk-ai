@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { ArrowRight, Loader2, Send, Sparkles } from '@lucide/vue';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import TicketChatController from '@/actions/App/Http/Controllers/Api/TicketChatController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { postJson } from '@/lib/api';
 
+type InstallationOption = {
+    id: number;
+    repositoryFullName: string;
+};
+
 type ProjectOption = {
     id: number;
     name: string;
+    installations: InstallationOption[];
 };
 
 type ChatMessage = {
@@ -35,7 +41,7 @@ type Ticket = {
     messages: ChatMessage[];
 };
 
-defineProps<{
+const props = defineProps<{
     projects: ProjectOption[];
 }>();
 
@@ -52,6 +58,7 @@ const currentTeam = computed(() => page.props.currentTeam);
 
 const step = ref<'details' | 'chat'>('details');
 const projectId = ref<number | null>(null);
+const installationId = ref<number | null>(null);
 const title = ref('');
 const initialPrompt = ref('');
 const ticket = ref<Ticket | null>(null);
@@ -61,6 +68,14 @@ const generating = ref(false);
 const error = ref<string | null>(null);
 
 const messagesEl = ref<HTMLElement | null>(null);
+
+const selectedProject = computed(
+    () => props.projects.find((project) => project.id === projectId.value) ?? null,
+);
+
+watch(projectId, () => {
+    installationId.value = null;
+});
 
 const scrollToBottom = async (): Promise<void> => {
     await nextTick();
@@ -80,6 +95,7 @@ const startDiscovery = async (): Promise<void> => {
         const response = await postJson(TicketChatController.store(projectId.value).url, {
             title: title.value,
             initial_prompt: initialPrompt.value,
+            ...(installationId.value ? { github_installation_id: installationId.value } : {}),
         });
 
         if (!response.ok) {
@@ -167,6 +183,27 @@ const generatePrd = async (): Promise<void> => {
                             {{ project.name }}
                         </option>
                     </select>
+                </div>
+
+                <div v-if="selectedProject && selectedProject.installations.length > 0" class="grid gap-2">
+                    <Label for="repository">Repository</Label>
+                    <select
+                        id="repository"
+                        v-model.number="installationId"
+                        class="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                    >
+                        <option :value="null">All repositories</option>
+                        <option
+                            v-for="installation in selectedProject.installations"
+                            :key="installation.id"
+                            :value="installation.id"
+                        >
+                            {{ installation.repositoryFullName }}
+                        </option>
+                    </select>
+                    <p class="text-muted-foreground text-xs">
+                        The AI analyst will only use the selected repository's code as context.
+                    </p>
                 </div>
 
                 <div class="grid gap-2">

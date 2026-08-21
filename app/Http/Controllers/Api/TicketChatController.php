@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\TicketStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TicketResource;
+use App\Models\GithubInstallation;
 use App\Models\Project;
 use App\Models\Ticket;
 use App\Services\DiscoveryAgentService;
@@ -13,6 +14,7 @@ use App\Services\TicketChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 class TicketChatController extends Controller
 {
@@ -40,17 +42,27 @@ class TicketChatController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'initial_prompt' => ['required', 'string'],
+            'github_installation_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('github_installations', 'id')->where('project_id', $project->id),
+            ],
         ]);
+
+        $installation = isset($validated['github_installation_id'])
+            ? GithubInstallation::query()->findOrFail($validated['github_installation_id'])
+            : null;
 
         $ticket = $this->discoveryAgent->reply(
             $this->ticketChat->startTicket(
                 $project,
                 $validated['title'],
                 $validated['initial_prompt'],
+                $installation,
             ),
         );
 
-        return (new TicketResource($ticket))
+        return (new TicketResource($ticket->load('installation')))
             ->response()
             ->setStatusCode(JsonResponse::HTTP_CREATED);
     }

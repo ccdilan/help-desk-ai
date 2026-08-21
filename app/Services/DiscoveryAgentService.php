@@ -46,7 +46,7 @@ class DiscoveryAgentService
         $context = [];
 
         if ($latestUser !== null) {
-            $context = $this->relevantContext($ticket->project_id, $latestUser->content);
+            $context = $this->relevantContext($ticket, $latestUser->content);
         }
 
         $reply = $this->completions->complete([
@@ -62,17 +62,21 @@ class DiscoveryAgentService
     /**
      * Find repository files relevant to the user's message.
      *
+     * When the ticket is scoped to a specific repository, only that
+     * repository's indexed chunks are searched.
+     *
      * Returns file paths only — raw source code is never exposed to the model.
      *
      * @return list<string>
      */
-    private function relevantContext(int $projectId, string $message): array
+    private function relevantContext(Ticket $ticket, string $message): array
     {
         try {
             $results = $this->codeChunks->searchSimilar(
-                $projectId,
+                $ticket->project_id,
                 $this->embeddings->embed($message),
                 self::CONTEXT_LIMIT,
+                $ticket->github_installation_id,
             );
         } catch (RuntimeException) {
             // Vector search requires PostgreSQL; degrade gracefully without context.
