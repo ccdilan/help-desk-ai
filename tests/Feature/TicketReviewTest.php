@@ -14,6 +14,10 @@ test('the srs review page renders the initial prompt beside the generated prd', 
         'initial_prompt' => 'We need to export tickets in bulk.',
         'generated_prd' => "# SRS\n\nFR-1: Export to CSV.",
     ]);
+    $ticket->messages()->createMany([
+        ['role' => 'user', 'content' => 'I need bulk export.'],
+        ['role' => 'assistant', 'content' => 'Which formats do you need?'],
+    ]);
 
     $this->actingAs($user)
         ->get(route('tickets.show', [$team->slug, $ticket]))
@@ -24,6 +28,23 @@ test('the srs review page renders the initial prompt beside the generated prd', 
             ->where('ticket.initial_prompt', 'We need to export tickets in bulk.')
             ->where('ticket.status', TicketStatus::Review->value)
             ->where('ticket.generated_prd', "# SRS\n\nFR-1: Export to CSV.")
+            ->where('ticket.messages.0.role', 'user')
+            ->where('ticket.messages.0.content', 'I need bulk export.')
+            ->where('ticket.messages.1.role', 'assistant')
+        );
+});
+
+test('the srs review page shows an empty transcript when no messages exist', function () {
+    $user = User::factory()->create();
+    $team = $user->currentTeam;
+    $ticket = Ticket::factory()->reviewed()->create();
+
+    $this->actingAs($user)
+        ->get(route('tickets.show', [$team->slug, $ticket]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Tickets/Show')
+            ->has('ticket.messages', 0)
         );
 });
 

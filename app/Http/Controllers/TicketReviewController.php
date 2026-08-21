@@ -11,6 +11,8 @@ class TicketReviewController extends Controller
 {
     public function __invoke(Request $request, string $currentTeam, Ticket $ticket): Response
     {
+        $ticket->load('messages');
+
         return Inertia::render('Tickets/Show', [
             'ticket' => [
                 'id' => $ticket->id,
@@ -19,6 +21,12 @@ class TicketReviewController extends Controller
                 'status' => $ticket->status->value,
                 'status_label' => $ticket->status->label(),
                 'generated_prd' => $ticket->generated_prd,
+                'created_at' => $ticket->created_at?->toIso8601String(),
+                'messages' => $ticket->messages->map(fn ($message): array => [
+                    'id' => $message->id,
+                    'role' => $message->role,
+                    'content' => $message->content,
+                ]),
             ],
         ]);
     }
